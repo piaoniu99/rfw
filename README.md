@@ -2,7 +2,6 @@
 
 Rust Firewall - 基于 eBPF/XDP 的高性能防火墙，支持协议深度检测
 
-[![CI](https://github.com/narwhal-cloud/rfw/actions/workflows/ci.yml/badge.svg)](https://github.com/narwhal-cloud/rfw/actions/workflows/ci.yml)
 [![Release](https://github.com/narwhal-cloud/rfw/actions/workflows/build.yml/badge.svg)](https://github.com/narwhal-cloud/rfw/actions/workflows/build.yml)
 
 ## 目录
