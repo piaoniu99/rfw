@@ -78,21 +78,24 @@ jobs:
       with:
         path: artifacts
 
-    - name: Create checksums
+    - name: Prepare release files
       run: |
+        # 将所有二进制文件移到artifacts根目录
+        find artifacts -name 'rfw-*' -type f -exec mv {} artifacts/ \;
+
+        # 删除空的子目录
+        find artifacts -type d -empty -delete
+
+        # 创建统一的checksums文件
         cd artifacts
-        for dir in */; do
-          cd "$dir"
-          sha256sum * > checksums.txt
-          cd ..
-        done
+        sha256sum rfw-* > checksums.txt
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          artifacts/*/rfw-*
-          artifacts/*/checksums.txt
+          artifacts/rfw-*
+          artifacts/checksums.txt
         draft: false
         prerelease: false
         generate_release_notes: true
