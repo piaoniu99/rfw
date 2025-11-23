@@ -250,6 +250,17 @@ struct Opt {
     /// 警告: 启用此规则会使所有其他协议检测规则失效
     #[clap(long)]
     block_all: bool,
+
+    /// XDP 附加模式
+    ///
+    /// - auto: 自动选择最佳模式(默认)
+    /// - skb: SKB 模式 - 兼容性最好,适用于所有网卡,但性能较低
+    /// - drv: 驱动模式 - 需要网卡驱动支持,性能较高
+    /// - hw: 硬件模式 - 需要网卡硬件支持,性能最高
+    ///
+    /// 如果默认模式附加失败,请尝试使用 --xdp-mode skb
+    #[clap(long, default_value = "auto")]
+    xdp_mode: String,
 }
 
 #[tokio::main]
@@ -486,13 +497,41 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let Opt { iface, .. } = opt;
+    let Opt { iface, xdp_mode, .. } = opt;
+
+    // 根据用户选择确定 XDP 模式
+    let xdp_flags = match xdp_mode.to_lowercase().as_str() {
+        "skb" => {
+            info!("使用 SKB 模式附加 XDP 程序 (兼容模式)");
+            XdpFlags::SKB_MODE
+        }
+        "drv" | "driver" => {
+            info!("使用驱动模式附加 XDP 程序 (需要驱动支持)");
+            XdpFlags::DRV_MODE
+        }
+        "hw" | "hardware" => {
+            info!("使用硬件模式附加 XDP 程序 (需要硬件支持)");
+            XdpFlags::HW_MODE
+        }
+        "auto" => {
+            info!("使用自动模式附加 XDP 程序");
+            XdpFlags::default()
+        }
+        mode => {
+            warn!("未知的 XDP 模式 '{}', 使用自动模式", mode);
+            XdpFlags::default()
+        }
+    };
+
     let program: &mut Xdp = ebpf.program_mut("rfw").unwrap().try_into()?;
     program.load()?;
-    program.attach(&iface, XdpFlags::default())
-        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+    program.attach(&iface, xdp_flags)
+        .context(format!(
+            "无法以 {} 模式附加 XDP 程序到接口 {}。\n提示: 如果附加失败，请尝试使用 --xdp-mode skb 选项",
+            xdp_mode, iface
+        ))?;
 
-    info!("XDP 程序已附加到接口: {}", iface);
+    info!("XDP 程序已成功附加到接口: {} (模式: {})", iface, xdp_mode);
     let ctrl_c = signal::ctrl_c();
     println!("防火墙运行中，按 Ctrl-C 退出...");
     ctrl_c.await?;
